@@ -3,10 +3,12 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: spotshare
-      POSTGRES_USER: spotshare
-      POSTGRES_PASSWORD: spotshare_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -19,11 +21,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://spotshare:spotshare_password@postgres:5432/spotshare
-      JWT_SECRET: change_this_to_a_random_secure_string
-      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: ${PORT}
+      ADMIN_REFERRAL_CODE: ${ADMIN_REFERRAL_CODE}
     depends_on:
       - postgres
     networks:
