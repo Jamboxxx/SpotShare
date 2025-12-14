@@ -49,7 +49,7 @@ A self-hosted platform for urban explorers to safely share locations with their 
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Jamboxxx/SpotShare
 cd SpotShare
 ```
 
