@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: spotshare
+      POSTGRES_USER: spotshare
+      POSTGRES_PASSWORD: spotshare_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - spotshare_network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://spotshare:spotshare_password@postgres:5432/spotshare
+      JWT_SECRET: change_this_to_a_random_secure_string
+      PORT: 3000
+    depends_on:
+      - postgres
+    networks:
+      - spotshare_network
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - spotshare_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads:
+
+networks:
+  spotshare_network:
+    driver: bridge
