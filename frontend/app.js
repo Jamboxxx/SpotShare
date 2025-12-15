@@ -565,18 +565,23 @@ function showSection(section) {
 }
 
 function openAddPinModal() {
-  // Clear form fields
+  // Only clear title, description, and images - NOT coordinates
   document.getElementById('pinTitle').value = '';
   document.getElementById('pinDescription').value = '';
-  document.getElementById('pinLat').value = '';
-  document.getElementById('pinLon').value = '';
   document.getElementById('pinImages').value = '';
   
+  // If there's a preview marker, use its coordinates
+  if (previewMarker && selectedLocation) {
+    document.getElementById('pinLat').value = selectedLocation.lat.toFixed(6);
+    document.getElementById('pinLon').value = selectedLocation.lng.toFixed(6);
+    document.getElementById('addPinError').style.display = 'none';
+  } else {
+    document.getElementById('addPinError').style.display = 'block';
+    document.getElementById('addPinError').textContent = 'Click on the map to set location first';
+    document.getElementById('addPinError').style.background = '#FF9800';
+  }
+  
   document.getElementById('addPinModal').classList.add('active');
-  document.getElementById('addPinError').style.display = 'block';
-  document.getElementById('addPinError').textContent = 'Click on the map to set location...';
-  document.getElementById('addPinError').style.background = '#2196F3';
-  isAddingPin = true;
 }
 
 function openCreateGroupModal() {
