@@ -7,6 +7,7 @@ let markers = [];
 let token = localStorage.getItem('token');
 let currentUser = null;
 let selectedLocation = null;
+let isAddingPin = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -127,10 +128,13 @@ function initMap() {
 
   // Click to set location when adding pin
   map.on('click', (e) => {
-    if (document.getElementById('addPinModal').classList.contains('active')) {
+    if (isAddingPin) {
       selectedLocation = e.latlng;
       document.getElementById('pinLat').value = e.latlng.lat.toFixed(6);
       document.getElementById('pinLon').value = e.latlng.lng.toFixed(6);
+      isAddingPin = false;
+      document.getElementById('addPinError').textContent = '';
+      document.getElementById('addPinError').style.display = 'none';
     }
   });
 
@@ -248,9 +252,26 @@ async function addPin() {
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to add pin');
+      let errorMessage = 'Failed to add pin';
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const data = await response.json();
+          errorMessage = data.error || errorMessage;
+        } catch (e) {
+          errorMessage = 'Server error (invalid response format)';
+        }
+      } else {
+        try {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        } catch (e) {
+          errorMessage = 'Server error';
+        }
+      }
+      throw new Error(errorMessage);
     }
+    const data = await response.json();
 
     closeModal('addPinModal');
     document.getElementById('pinTitle').value = '';
@@ -516,7 +537,10 @@ function showSection(section) {
 
 function openAddPinModal() {
   document.getElementById('addPinModal').classList.add('active');
-  document.getElementById('addPinError').style.display = 'none';
+  document.getElementById('addPinError').style.display = 'block';
+  document.getElementById('addPinError').textContent = 'Click on the map to set location...';
+  document.getElementById('addPinError').style.background = '#2196F3';
+  isAddingPin = true;
 }
 
 function openCreateGroupModal() {
