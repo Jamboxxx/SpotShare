@@ -304,6 +304,42 @@
       color: #fff;
     }
 
+    .map-layer-switcher {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+      z-index: 400;
+    }
+
+    .map-layer-switcher button {
+      display: block;
+      width: 100%;
+      padding: 10px 15px;
+      background: white;
+      border: none;
+      color: #333;
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+
+    .map-layer-switcher button:hover {
+      background: #f0f0f0;
+    }
+
+    .map-layer-switcher button.active {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .map-layer-switcher button:not(:last-child) {
+      border-bottom: 1px solid #e0e0e0;
+    }
+
     .leaflet-popup-content {
       color: #000;
     }
@@ -376,6 +412,11 @@
     <div id="map"></div>
     
     <button class="sidebar-toggle" onclick="toggleSidebar()">☰ Menu</button>
+
+    <div class="map-layer-switcher" id="mapLayerSwitcher">
+      <button id="btnStreet" class="active" onclick="changeMapLayer('street')">Street</button>
+      <button id="btnSatellite" onclick="changeMapLayer('satellite')">Satellite</button>
+    </div>
     
     <div class="sidebar" id="sidebar">
       <div class="user-info">

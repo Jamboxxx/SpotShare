@@ -9,6 +9,8 @@ let currentUser = null;
 let selectedLocation = null;
 let isAddingPin = false;
 let previewMarker = null;
+let streetTileLayer = null;
+let satelliteTileLayer = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -122,10 +124,17 @@ function initMap() {
   
   map = L.map('map').setView([40.7128, -74.0060], 13); // Default to NYC
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  streetTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 19
-  }).addTo(map);
+  });
+
+  satelliteTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri',
+    maxZoom: 18
+  });
+
+  streetTileLayer.addTo(map);
 
   // Click to place preview marker and set location when adding pin
   map.on('click', (e) => {
@@ -595,6 +604,21 @@ function updatePreviewMarker(latlng) {
 
   // Store location
   selectedLocation = latlng;
+}
+
+// Map layer switcher
+function changeMapLayer(layerType) {
+  if (layerType === 'street') {
+    map.removeLayer(satelliteTileLayer);
+    map.addLayer(streetTileLayer);
+    document.getElementById('btnStreet').classList.add('active');
+    document.getElementById('btnSatellite').classList.remove('active');
+  } else if (layerType === 'satellite') {
+    map.removeLayer(streetTileLayer);
+    map.addLayer(satelliteTileLayer);
+    document.getElementById('btnSatellite').classList.add('active');
+    document.getElementById('btnStreet').classList.remove('active');
+  }
 }
 
 // Close modals when clicking outside
