@@ -187,7 +187,7 @@ async function loadPins() {
         iconSize: [25, 25]
       });
 
-      const marker = L.marker([pin.latitude, pin.longitude], { icon }).addTo(map);
+      const marker = L.marker([pin.latitude, pin.longitude], { icon, pinId: pin.id }).addTo(map);
       
       let popupContent = `
         <strong>${pin.title}</strong><br>
@@ -212,24 +212,20 @@ async function loadPins() {
       markers.push(marker);
     });
 
-    // Update pins list
+    // Update pins list in sidebar
     const pinsList = document.getElementById('pinsList');
     const ownPins = pins.filter(p => p.user_id === currentUser.id);
     
     if (ownPins.length === 0) {
       pinsList.innerHTML = '<p style="color:#999;">No pins yet</p>';
     } else {
-      pinsList.innerHTML = ownPins.map(pin => `
-        <div class="pin-item">
-          <h4>${pin.title}</h4>
-          <p>${pin.description || ''}</p>
-          <p><small>📍 ${pin.latitude.toFixed(4)}, ${pin.longitude.toFixed(4)}</small></p>
-          ${pin.images && pin.images.length > 0 ? `
-            <div class="pin-images">
-              ${pin.images.map(img => img ? `<img src="${API_URL.replace('/api', '')}/uploads/${img}" alt="Pin image">` : '').join('')}
-            </div>
-          ` : ''}
-          <button class="small-button danger" onclick="deletePin(${pin.id})">Delete</button>
+      // Sort alphabetically by title
+      const sortedPins = ownPins.sort((a, b) => a.title.localeCompare(b.title));
+      
+      pinsList.innerHTML = sortedPins.map(pin => `
+        <div class="pin-item" style="cursor: pointer; padding: 12px; margin-bottom: 8px;" 
+             onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})">
+          <h4 style="margin: 0;">${pin.title}</h4>
         </div>
       `).join('');
     }
@@ -631,6 +627,18 @@ function updatePreviewMarker(latlng) {
 
   // Store location
   selectedLocation = latlng;
+}
+
+// Navigate to a specific pin on the map
+function goToPin(lat, lng, pinId) {
+  map.setView([lat, lng], 15);
+  
+  // Find and open the popup for this pin
+  map.eachLayer(layer => {
+    if (layer instanceof L.Marker && layer.options.pinId === pinId) {
+      layer.openPopup();
+    }
+  });
 }
 
 // Map layer switcher
