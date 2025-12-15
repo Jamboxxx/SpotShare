@@ -122,7 +122,7 @@ function showApp() {
 function initMap() {
   if (map) return;
   
-  map = L.map('map').setView([40.7128, -74.0060], 13); // Default to NYC
+  map = L.map('map').setView([53.4129, -8.2439], 7); // Default to Ireland
 
   streetTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
@@ -166,9 +166,13 @@ async function loadPins() {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
-    if (!response.ok) throw new Error('Failed to load pins');
+    if (!response.ok) {
+      console.error('Failed to load pins, status:', response.status);
+      throw new Error('Failed to load pins');
+    }
 
     const pins = await response.json();
+    console.log('Loaded pins:', pins.length);
     
     // Clear existing markers
     markers.forEach(marker => marker.remove());
@@ -286,6 +290,13 @@ async function addPin() {
       throw new Error(errorMessage);
     }
     const data = await response.json();
+    console.log('Pin created successfully:', data);
+
+    // Remove preview marker
+    if (previewMarker) {
+      map.removeLayer(previewMarker);
+      previewMarker = null;
+    }
 
     closeModal('addPinModal');
     document.getElementById('pinTitle').value = '';
@@ -293,10 +304,14 @@ async function addPin() {
     document.getElementById('pinLat').value = '';
     document.getElementById('pinLon').value = '';
     document.getElementById('pinImages').value = '';
-    loadPins();
+    
+    // Reload pins to show the new one
+    await loadPins();
   } catch (error) {
+    console.error('Add pin error:', error);
     errorDiv.textContent = error.message;
     errorDiv.style.display = 'block';
+    errorDiv.style.background = '#f44336';
   }
 }
 
@@ -550,6 +565,13 @@ function showSection(section) {
 }
 
 function openAddPinModal() {
+  // Clear form fields
+  document.getElementById('pinTitle').value = '';
+  document.getElementById('pinDescription').value = '';
+  document.getElementById('pinLat').value = '';
+  document.getElementById('pinLon').value = '';
+  document.getElementById('pinImages').value = '';
+  
   document.getElementById('addPinModal').classList.add('active');
   document.getElementById('addPinError').style.display = 'block';
   document.getElementById('addPinError').textContent = 'Click on the map to set location...';
