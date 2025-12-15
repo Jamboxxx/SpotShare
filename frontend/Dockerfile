@@ -7,6 +7,7 @@ COPY app.js /usr/share/nginx/html/
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
+    client_max_body_size 50M; \
     \
     location / { \
         root /usr/share/nginx/html; \
@@ -21,6 +22,7 @@ RUN echo 'server { \
         proxy_set_header Connection "upgrade"; \
         proxy_set_header Host $host; \
         proxy_cache_bypass $http_upgrade; \
+        client_max_body_size 50M; \
     } \
     \
     location /uploads { \

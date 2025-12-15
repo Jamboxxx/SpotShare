@@ -8,6 +8,7 @@ let token = localStorage.getItem('token');
 let currentUser = null;
 let selectedLocation = null;
 let isAddingPin = false;
+let previewMarker = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -126,7 +127,7 @@ function initMap() {
     maxZoom: 19
   }).addTo(map);
 
-  // Click to set location when adding pin
+  // Click to place preview marker and set location when adding pin
   map.on('click', (e) => {
     if (isAddingPin) {
       selectedLocation = e.latlng;
@@ -135,6 +136,10 @@ function initMap() {
       isAddingPin = false;
       document.getElementById('addPinError').textContent = '';
       document.getElementById('addPinError').style.display = 'none';
+      updatePreviewMarker(e.latlng);
+    } else {
+      // Allow clicking map to place a preview marker even when not in add mode
+      updatePreviewMarker(e.latlng);
     }
   });
 
@@ -561,6 +566,35 @@ function openImportGPXModal() {
 
 function closeModal(modalId) {
   document.getElementById(modalId).classList.remove('active');
+}
+
+// Update preview marker on map
+function updatePreviewMarker(latlng) {
+  // Remove old marker if exists
+  if (previewMarker) {
+    map.removeLayer(previewMarker);
+  }
+
+  // Create new marker with distinctive style
+  const icon = L.divIcon({
+    html: `<div style="background:#FF6B6B;width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(255,107,107,0.5);display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;background:white;border-radius:50%;"></div></div>`,
+    className: '',
+    iconSize: [30, 30]
+  });
+
+  previewMarker = L.marker(latlng, { icon }).addTo(map);
+
+  // Show coordinates in popup
+  const popupContent = `
+    <strong>Spot Location</strong><br>
+    Lat: ${latlng.lat.toFixed(6)}<br>
+    Lon: ${latlng.lng.toFixed(6)}<br>
+    <small>Click "Add Pin" to create</small>
+  `;
+  previewMarker.bindPopup(popupContent).openPopup();
+
+  // Store location
+  selectedLocation = latlng;
 }
 
 // Close modals when clicking outside
