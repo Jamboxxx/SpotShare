@@ -15,8 +15,15 @@ const initDatabase = async () => {
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        is_admin BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Add is_admin column if it doesn't exist (for existing databases)
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE
     `);
 
     // Referral codes table
@@ -81,6 +88,32 @@ const initDatabase = async () => {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_pins_user ON pins(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id)`);
+
+    // Create admin user if provided
+    if (process.env.ADMIN_PASSWORD) {
+      const bcrypt = require('bcryptjs');
+      const adminUsername = 'Admin';
+      const adminPasswordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+      
+      const adminCheck = await client.query(
+        'SELECT id FROM users WHERE username = $1',
+        [adminUsername]
+      );
+      
+      if (adminCheck.rows.length === 0) {
+        await client.query(
+          'INSERT INTO users (username, password_hash, is_admin) VALUES ($1, $2, $3)',
+          [adminUsername, adminPasswordHash, true]
+        );
+        console.log('Admin user created successfully');
+      } else {
+        // Update existing Admin user to ensure is_admin is true
+        await client.query(
+          'UPDATE users SET is_admin = TRUE WHERE username = $1',
+          [adminUsername]
+        );
+      }
+    }
 
     // Create admin referral code if provided
     if (process.env.ADMIN_REFERRAL_CODE) {

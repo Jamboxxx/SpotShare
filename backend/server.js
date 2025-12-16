@@ -137,9 +137,9 @@ app.post('/api/auth/register', [
       );
     }
 
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({ token, user: { id: user.id, username: user.username } });
+    res.json({ token, user: { id: user.id, username: user.username, is_admin: user.is_admin } });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Registration failed' });
@@ -172,9 +172,9 @@ app.post('/api/auth/login', [
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({ token, user: { id: user.id, username: user.username } });
+    res.json({ token, user: { id: user.id, username: user.username, is_admin: user.is_admin } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
@@ -212,26 +212,46 @@ app.post('/api/referrals/generate', authenticateToken, async (req, res) => {
 
 // ============= PINS ROUTES =============
 
-// Get pins (user's own + group members')
+// Get pins (user's own + group members', or all if admin)
 app.get('/api/pins', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT DISTINCT p.*, u.username, 
-        ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
-      FROM pins p
-      JOIN users u ON p.user_id = u.id
-      LEFT JOIN pin_images pi ON p.id = pi.pin_id
-      WHERE p.user_id = $1
-        OR p.user_id IN (
-          SELECT gm2.user_id 
-          FROM group_members gm1
-          JOIN group_members gm2 ON gm1.group_id = gm2.group_id
-          WHERE gm1.user_id = $1 AND gm2.user_id != $1
-        )
-      GROUP BY p.id, u.username
-      ORDER BY p.created_at DESC
-    `, [req.user.id]);
+    let query;
+    let params;
     
+    if (req.user.is_admin) {
+      // Admin sees all pins
+      query = `
+        SELECT DISTINCT p.*, u.username, 
+          ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
+        FROM pins p
+        JOIN users u ON p.user_id = u.id
+        LEFT JOIN pin_images pi ON p.id = pi.pin_id
+        GROUP BY p.id, u.username
+        ORDER BY p.created_at DESC
+      `;
+      params = [];
+    } else {
+      // Regular user sees own pins + group members' pins
+      query = `
+        SELECT DISTINCT p.*, u.username, 
+          ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
+        FROM pins p
+        JOIN users u ON p.user_id = u.id
+        LEFT JOIN pin_images pi ON p.id = pi.pin_id
+        WHERE p.user_id = $1
+          OR p.user_id IN (
+            SELECT gm2.user_id 
+            FROM group_members gm1
+            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+            WHERE gm1.user_id = $1 AND gm2.user_id != $1
+          )
+        GROUP BY p.id, u.username
+        ORDER BY p.created_at DESC
+      `;
+      params = [req.user.id];
+    }
+    
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Get pins error:', error);

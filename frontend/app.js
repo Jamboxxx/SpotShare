@@ -109,8 +109,9 @@ function showApp() {
   
   // Get current user info
   const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-  currentUser = { id: tokenPayload.id, username: tokenPayload.username };
-  document.getElementById('userNameDisplay').textContent = `👤 ${currentUser.username}`;
+  currentUser = { id: tokenPayload.id, username: tokenPayload.username, is_admin: tokenPayload.is_admin };
+  const adminBadge = currentUser.is_admin ? 'ADMIN' : '';
+  document.getElementById('userNameDisplay').textContent = `👤 ${currentUser.username}${adminBadge}`;
   
   initMap();
   loadPins();
@@ -214,18 +215,19 @@ async function loadPins() {
 
     // Update pins list in sidebar
     const pinsList = document.getElementById('pinsList');
-    const ownPins = pins.filter(p => p.user_id === currentUser.id);
+    let displayPins = currentUser.is_admin ? pins : pins.filter(p => p.user_id === currentUser.id);
     
-    if (ownPins.length === 0) {
+    if (displayPins.length === 0) {
       pinsList.innerHTML = '<p style="color:#999;">No pins yet</p>';
     } else {
       // Sort alphabetically by title
-      const sortedPins = ownPins.sort((a, b) => a.title.localeCompare(b.title));
+      const sortedPins = displayPins.sort((a, b) => a.title.localeCompare(b.title));
       
-      pinsList.innerHTML = sortedPins.map(pin => `
+      pinsList.innerHTML = (currentUser.is_admin ? '<p style="color:#FFB700; margin-bottom: 12px;"><small>📍 All Pins</small></p>' : '') + sortedPins.map(pin => `
         <div class="pin-item" style="cursor: pointer; padding: 12px; margin-bottom: 8px;" 
              onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})">
           <h4 style="margin: 0;">${pin.title}</h4>
+          ${currentUser.is_admin ? `<small style="color: #999;">by ${pin.username}</small>` : ''}
         </div>
       `).join('');
     }
