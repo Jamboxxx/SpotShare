@@ -748,7 +748,7 @@ async function loadUserPins(userId, username) {
       pinsHtml += pins.map(pin => `
         <div class="pin-item" style="cursor: pointer;" onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})">
           <h4 style="margin: 0;">${pin.title}</h4>
-          <small style="color: #999;">📍 ${pin.latitude.toFixed(4)}, ${pin.longitude.toFixed(4)}</small>
+          <small style="color: #999;">📍 ${parseFloat(pin.latitude).toFixed(4)}, ${parseFloat(pin.longitude).toFixed(4)}</small>
           ${pin.description ? `<p style="margin: 5px 0; font-size: 12px;">${pin.description}</p>` : ''}
         </div>
       `).join('');
