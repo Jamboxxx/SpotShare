@@ -728,22 +728,36 @@ async function loadUserPins(userId, username) {
     const response = await fetch(`${API_URL}/admin/users/${userId}/pins`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
+    
+    if (!response.ok) {
+      console.error('Error fetching user pins:', response.status);
+      return;
+    }
+    
     const pins = await response.json();
+    console.log('Loaded pins:', pins);
     
     const content = document.getElementById('adminContent');
-    content.innerHTML = `
-      <button onclick="loadAdminUsers()" class="secondary">← Back to Users</button>
-      <h3 style="margin-top: 15px;">${username}'s Pins (${pins.length})</h3>
-      ${pins.length === 0 ? '<p style="color:#999;">No pins</p>' : pins.map(pin => `
+    
+    let pinsHtml = '<button onclick="loadAdminUsers()" class="secondary">← Back to Users</button>';
+    pinsHtml += `<h3 style="margin-top: 15px;">${username}'s Pins (${pins.length})</h3>`;
+    
+    if (pins.length === 0) {
+      pinsHtml += '<p style="color:#999;">No pins</p>';
+    } else {
+      pinsHtml += pins.map(pin => `
         <div class="pin-item" style="cursor: pointer;" onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})">
           <h4 style="margin: 0;">${pin.title}</h4>
           <small style="color: #999;">📍 ${pin.latitude.toFixed(4)}, ${pin.longitude.toFixed(4)}</small>
           ${pin.description ? `<p style="margin: 5px 0; font-size: 12px;">${pin.description}</p>` : ''}
         </div>
-      `).join('')}
-    `;
+      `).join('');
+    }
+    
+    content.innerHTML = pinsHtml;
   } catch (error) {
     console.error('Load user pins error:', error);
+    document.getElementById('adminContent').innerHTML = `<p style="color: #f44336;">Error loading pins: ${error.message}</p>`;
   }
 }
 
