@@ -427,8 +427,7 @@
       <div class="tab-buttons">
         <button onclick="showSection('pins')" id="pinsTab">My Pins</button>
         <button class="secondary" onclick="showSection('groups')" id="groupsTab">Groups</button>
-        <button class="secondary" onclick="showSection('referrals')" id="referralsTab">Codes</button>
-      </div>
+        <button class="secondary" onclick="showSection('referrals')" id="referralsTab">Codes</button>        <button class="secondary" onclick="showSection('admin')" id="adminTab" style="display:none;">Admin</button>      </div>
 
       <!-- Pins Section -->
       <div class="section active" id="pinsSection">
@@ -451,6 +450,15 @@
         <button onclick="generateReferralCode()">Generate New Code</button>
         <h3 style="margin-top: 20px;">Your Referral Codes</h3>
         <div id="referralsList"></div>
+      </div>
+
+      <!-- Admin Section -->
+      <div class="section" id="adminSection">
+        <div class="tab-buttons" style="margin-bottom: 15px;">
+          <button class="secondary" onclick="loadAdminUsers()" id="adminUsersBtn">Users</button>
+          <button class="secondary" onclick="loadAdminGroups()" id="adminGroupsBtn">Groups</button>
+        </div>
+        <div id="adminContent"></div>
       </div>
     </div>
   </div>

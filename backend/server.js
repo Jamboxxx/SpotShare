@@ -574,6 +574,79 @@ app.post('/api/import/gpx', authenticateToken, upload.single('gpxFile'), async (
   }
 });
 
+// ============= ADMIN ROUTES =============
+
+// Get all users (admin only)
+app.get('/api/admin/users', authenticateToken, async (req, res) => {
+  if (!req.user.is_admin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT u.id, u.username, u.is_admin, u.created_at, COUNT(p.id) as pin_count
+      FROM users u
+      LEFT JOIN pins p ON u.id = p.user_id
+      GROUP BY u.id
+      ORDER BY u.username ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Get all groups with members (admin only)
+app.get('/api/admin/groups', authenticateToken, async (req, res) => {
+  if (!req.user.is_admin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT g.id, g.name, g.invite_code, g.created_by, u.username as created_by_username, g.created_at,
+        COUNT(gm.user_id) as member_count,
+        JSON_AGG(JSON_BUILD_OBJECT('user_id', gm.user_id, 'username', mu.username, 'joined_at', gm.joined_at)) FILTER (WHERE gm.user_id IS NOT NULL) as members
+      FROM groups g
+      LEFT JOIN users u ON g.created_by = u.id
+      LEFT JOIN group_members gm ON g.id = gm.group_id
+      LEFT JOIN users mu ON gm.user_id = mu.id
+      GROUP BY g.id, u.username
+      ORDER BY g.name ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get admin groups error:', error);
+    res.status(500).json({ error: 'Failed to fetch groups' });
+  }
+});
+
+// Get all pins by a specific user (admin only)
+app.get('/api/admin/users/:userId/pins', authenticateToken, async (req, res) => {
+  if (!req.user.is_admin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT p.*, u.username,
+        ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
+      FROM pins p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN pin_images pi ON p.id = pi.pin_id
+      WHERE p.user_id = $1
+      GROUP BY p.id, u.username
+      ORDER BY p.created_at DESC
+    `, [req.params.userId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get user pins error:', error);
+    res.status(500).json({ error: 'Failed to fetch user pins' });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

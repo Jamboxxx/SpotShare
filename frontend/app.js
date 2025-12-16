@@ -110,8 +110,13 @@ function showApp() {
   // Get current user info
   const tokenPayload = JSON.parse(atob(token.split('.')[1]));
   currentUser = { id: tokenPayload.id, username: tokenPayload.username, is_admin: tokenPayload.is_admin };
-  const adminBadge = currentUser.is_admin ? 'ADMIN' : '';
+  const adminBadge = currentUser.is_admin ? ' 👑 ADMIN' : '';
   document.getElementById('userNameDisplay').textContent = `👤 ${currentUser.username}${adminBadge}`;
+  
+  // Show admin tab if user is admin
+  if (currentUser.is_admin) {
+    document.getElementById('adminTab').style.display = 'block';
+  }
   
   initMap();
   loadPins();
@@ -655,6 +660,90 @@ function changeMapLayer(layerType) {
     map.addLayer(satelliteTileLayer);
     document.getElementById('btnSatellite').classList.add('active');
     document.getElementById('btnStreet').classList.remove('active');
+  }
+}
+
+// ============= ADMIN FUNCTIONS =============
+
+async function loadAdminUsers() {
+  if (!currentUser.is_admin) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/admin/users`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const users = await response.json();
+    
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+      <h3>All Users (${users.length})</h3>
+      ${users.map(user => `
+        <div class="pin-item" style="cursor: pointer;" onclick="loadUserPins(${user.id}, '${user.username}')">
+          <h4 style="margin: 0;">${user.username}${user.is_admin ? ' 👑' : ''}</h4>
+          <small style="color: #999;">📍 ${user.pin_count} pins</small>
+        </div>
+      `).join('')}
+    `;
+  } catch (error) {
+    console.error('Load admin users error:', error);
+  }
+}
+
+async function loadAdminGroups() {
+  if (!currentUser.is_admin) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/admin/groups`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const groups = await response.json();
+    
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+      <h3>All Groups (${groups.length})</h3>
+      ${groups.map(group => `
+        <div class="group-item">
+          <h4>${group.name}</h4>
+          <small style="color: #999;">Created by: ${group.created_by_username}</small>
+          <p><small>Members: ${group.member_count}</small></p>
+          <p><small>Invite Code: <span class="code-display">${group.invite_code}</span></small></p>
+          ${group.members && group.members.length > 0 ? `
+            <div style="background: #1a1a1a; padding: 10px; border-radius: 3px; margin-top: 8px;">
+              <small style="color: #4CAF50;">Members:</small>
+              ${group.members.map(m => `<div style="padding: 4px 0;"><small>• ${m.username}</small></div>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `).join('')}
+    `;
+  } catch (error) {
+    console.error('Load admin groups error:', error);
+  }
+}
+
+async function loadUserPins(userId, username) {
+  if (!currentUser.is_admin) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/admin/users/${userId}/pins`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const pins = await response.json();
+    
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+      <button onclick="loadAdminUsers()" class="secondary">← Back to Users</button>
+      <h3 style="margin-top: 15px;">${username}'s Pins (${pins.length})</h3>
+      ${pins.length === 0 ? '<p style="color:#999;">No pins</p>' : pins.map(pin => `
+        <div class="pin-item" style="cursor: pointer;" onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})">
+          <h4 style="margin: 0;">${pin.title}</h4>
+          <small style="color: #999;">📍 ${pin.latitude.toFixed(4)}, ${pin.longitude.toFixed(4)}</small>
+          ${pin.description ? `<p style="margin: 5px 0; font-size: 12px;">${pin.description}</p>` : ''}
+        </div>
+      `).join('')}
+    `;
+  } catch (error) {
+    console.error('Load user pins error:', error);
   }
 }
 
