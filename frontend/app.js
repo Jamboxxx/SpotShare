@@ -211,7 +211,9 @@ async function loadPins() {
       }
 
       if (isOwnPin) {
-        popupContent += `<br><button onclick="deletePin(${pin.id})" style="margin-top:10px;padding:5px 10px;background:#f44336;color:white;border:none;border-radius:3px;cursor:pointer;">Delete</button>`;
+        popupContent += `<br>
+          <button onclick="openEditPinModal(${pin.id})" style="margin-top:10px;padding:5px 10px;background:#4CAF50;color:white;border:none;border-radius:3px;cursor:pointer;margin-right:5px;">Edit</button>
+          <button onclick="deletePin(${pin.id})" style="padding:5px 10px;background:#f44336;color:white;border:none;border-radius:3px;cursor:pointer;">Delete</button>`;
       }
 
       marker.bindPopup(popupContent);
@@ -228,13 +230,22 @@ async function loadPins() {
       // Sort alphabetically by title
       const sortedPins = displayPins.sort((a, b) => a.title.localeCompare(b.title));
       
-      pinsList.innerHTML = (currentUser.is_admin ? '<p style="color:#FFB700; margin-bottom: 12px;"><small>📍 All Pins</small></p>' : '') + sortedPins.map(pin => `
-        <div class="pin-item" style="cursor: pointer; padding: 12px; margin-bottom: 8px;" 
-             onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})">
-          <h4 style="margin: 0;">${pin.title}</h4>
-          ${currentUser.is_admin ? `<small style="color: #999;">by ${pin.username}</small>` : ''}
+      pinsList.innerHTML = (currentUser.is_admin ? '<p style="color:#FFB700; margin-bottom: 12px;"><small>📍 All Pins</small></p>' : '') + sortedPins.map(pin => {
+        const isOwnPin = pin.user_id === currentUser.id;
+        return `
+        <div class="pin-item" style="padding: 12px; margin-bottom: 8px;">
+          <div onclick="goToPin(${pin.latitude}, ${pin.longitude}, ${pin.id})" style="cursor: pointer;">
+            <h4 style="margin: 0;">${pin.title}</h4>
+            ${currentUser.is_admin ? `<small style="color: #999;">by ${pin.username}</small>` : ''}
+          </div>
+          ${isOwnPin ? `
+            <div style="margin-top: 8px;">
+              <button onclick="openEditPinModal(${pin.id}); event.stopPropagation();" class="small-button secondary" style="margin-right: 5px;">Edit</button>
+              <button onclick="deletePin(${pin.id}); event.stopPropagation();" class="small-button danger">Delete</button>
+            </div>
+          ` : ''}
         </div>
-      `).join('');
+      `}).join('');
     }
   } catch (error) {
     console.error('Load pins error:', error);
@@ -295,6 +306,19 @@ async function addPin() {
     const data = await response.json();
     console.log('Pin created successfully:', data);
 
+    // Save visibility settings
+    const selectedGroups = Array.from(document.querySelectorAll('#pinGroupsCheckbox input:checked')).map(cb => parseInt(cb.value));
+    if (selectedGroups.length > 0) {
+      await fetch(`${API_URL}/pins/${data.id}/visibility`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ groupIds: selectedGroups })
+      });
+    }
+
     // Remove preview marker
     if (previewMarker) {
       map.removeLayer(previewMarker);
@@ -332,6 +356,140 @@ async function deletePin(pinId) {
     loadPins();
   } catch (error) {
     alert('Failed to delete pin');
+  }
+}
+
+async function openEditPinModal(pinId) {
+  try {
+    // Fetch pin details
+    const response = await fetch(`${API_URL}/pins/${pinId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) throw new Error('Failed to load pin');
+    
+    const pin = await response.json();
+
+    // Populate form
+    document.getElementById('editPinId').value = pin.id;
+    document.getElementById('editPinTitle').value = pin.title;
+    document.getElementById('editPinDescription').value = pin.description || '';
+    document.getElementById('editPinLat').value = pin.latitude;
+    document.getElementById('editPinLon').value = pin.longitude;
+    
+    // Show existing images
+    const imagesDiv = document.getElementById('editPinCurrentImages');
+    if (pin.images && pin.images.length > 0) {
+      imagesDiv.innerHTML = '<p><small>Current images:</small></p>' + pin.images.map(img => 
+        `<img src="${API_URL.replace('/api', '')}/uploads/${img}" style="width: 80px; height: 80px; object-fit: cover; margin: 5px; border-radius: 5px;">`
+      ).join('');
+    } else {
+      imagesDiv.innerHTML = '';
+    }
+
+    // Load groups and visibility settings
+    await loadGroupsForVisibility('edit', pinId);
+    
+    document.getElementById('editPinModal').classList.add('active');
+  } catch (error) {
+    console.error('Open edit modal error:', error);
+    alert('Failed to load pin details');
+  }
+}
+
+async function updatePin() {
+  const pinId = document.getElementById('editPinId').value;
+  const title = document.getElementById('editPinTitle').value;
+  const description = document.getElementById('editPinDescription').value;
+  const lat = document.getElementById('editPinLat').value;
+  const lon = document.getElementById('editPinLon').value;
+  const images = document.getElementById('editPinImages').files;
+  const errorDiv = document.getElementById('editPinError');
+
+  if (!title || !lat || !lon) {
+    errorDiv.textContent = 'Title, latitude, and longitude are required';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('latitude', lat);
+    formData.append('longitude', lon);
+
+    for (let i = 0; i < images.length; i++) {
+      formData.append('images', images[i]);
+    }
+
+    const response = await fetch(`${API_URL}/pins/${pinId}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+
+    if (!response.ok) throw new Error('Failed to update pin');
+
+    // Update visibility settings
+    const selectedGroups = Array.from(document.querySelectorAll('#editPinGroupsCheckbox input:checked')).map(cb => parseInt(cb.value));
+    await fetch(`${API_URL}/pins/${pinId}/visibility`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ groupIds: selectedGroups })
+    });
+
+    closeModal('editPinModal');
+    await loadPins();
+  } catch (error) {
+    console.error('Update pin error:', error);
+    errorDiv.textContent = error.message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+async function loadGroupsForVisibility(modalType, pinId = null) {
+  try {
+    const response = await fetch(`${API_URL}/groups`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!response.ok) return;
+    
+    const groups = await response.json();
+    const containerId = modalType === 'add' ? 'pinGroupsCheckbox' : 'editPinGroupsCheckbox';
+    const container = document.getElementById(containerId);
+
+    if (groups.length === 0) {
+      container.innerHTML = '<p style="color: #999; font-size: 12px;">No groups available</p>';
+      return;
+    }
+
+    // Get current visibility settings if editing
+    let selectedGroupIds = [];
+    if (pinId) {
+      const visResponse = await fetch(`${API_URL}/pins/${pinId}/visibility`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (visResponse.ok) {
+        const visData = await visResponse.json();
+        selectedGroupIds = visData.map(v => v.group_id);
+      }
+    }
+
+    container.innerHTML = groups.map(group => `
+      <div style="margin: 5px 0;">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" value="${group.id}" ${selectedGroupIds.includes(group.id) ? 'checked' : ''} style="margin-right: 8px;">
+          <span>${group.name}</span>
+        </label>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Load groups for visibility error:', error);
   }
 }
 
@@ -567,7 +725,7 @@ function showSection(section) {
   document.getElementById(`${section}Tab`).classList.remove('secondary');
 }
 
-function openAddPinModal() {
+async function openAddPinModal() {
   // Only clear title, description, and images - NOT coordinates
   document.getElementById('pinTitle').value = '';
   document.getElementById('pinDescription').value = '';
@@ -583,6 +741,9 @@ function openAddPinModal() {
     document.getElementById('addPinError').textContent = 'Click on the map to set location first';
     document.getElementById('addPinError').style.background = '#FF9800';
   }
+  
+  // Load groups for visibility settings
+  await loadGroupsForVisibility('add');
   
   document.getElementById('addPinModal').classList.add('active');
 }

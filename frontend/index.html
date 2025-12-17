@@ -494,8 +494,55 @@
         <label>Images (max 5)</label>
         <input type="file" id="pinImages" accept="image/*" multiple>
       </div>
+      <div class="form-group">
+        <label>Share with Groups (optional)</label>
+        <div id="pinGroupsCheckbox" style="max-height: 150px; overflow-y: auto; background: #1a1a1a; padding: 10px; border-radius: 5px;">
+          <p style="color: #999; font-size: 12px;">Loading groups...</p>
+        </div>
+        <small style="color: #999;">If no groups selected, pin will be visible to all your group members</small>
+      </div>
       <button onclick="addPin()">Add Pin</button>
       <button class="secondary" onclick="closeModal('addPinModal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Edit Pin Modal -->
+  <div class="modal" id="editPinModal">
+    <div class="modal-content">
+      <span class="close-modal" onclick="closeModal('editPinModal')">&times;</span>
+      <h2>Edit Pin</h2>
+      <div id="editPinError" class="error" style="display:none;"></div>
+      <input type="hidden" id="editPinId">
+      <div class="form-group">
+        <label>Title *</label>
+        <input type="text" id="editPinTitle" required>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="editPinDescription" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Latitude *</label>
+        <input type="text" id="editPinLat" required>
+      </div>
+      <div class="form-group">
+        <label>Longitude *</label>
+        <input type="text" id="editPinLon" required>
+      </div>
+      <div class="form-group">
+        <label>Add More Images (max 5 total)</label>
+        <input type="file" id="editPinImages" accept="image/*" multiple>
+        <div id="editPinCurrentImages" style="margin-top: 10px;"></div>
+      </div>
+      <div class="form-group">
+        <label>Share with Groups (optional)</label>
+        <div id="editPinGroupsCheckbox" style="max-height: 150px; overflow-y: auto; background: #1a1a1a; padding: 10px; border-radius: 5px;">
+          <p style="color: #999; font-size: 12px;">Loading groups...</p>
+        </div>
+        <small style="color: #999;">If no groups selected, pin will be visible to all your group members</small>
+      </div>
+      <button onclick="updatePin()">Update Pin</button>
+      <button class="secondary" onclick="closeModal('editPinModal')">Cancel</button>
     </div>
   </div>
 

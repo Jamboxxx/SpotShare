@@ -84,10 +84,23 @@ const initDatabase = async () => {
       )
     `);
 
+    // Pin visibility table - controls which groups can see each pin
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pin_visibility (
+        id SERIAL PRIMARY KEY,
+        pin_id INTEGER REFERENCES pins(id) ON DELETE CASCADE,
+        group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(pin_id, group_id)
+      )
+    `);
+
     // Create indexes
     await client.query(`CREATE INDEX IF NOT EXISTS idx_pins_user ON pins(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_pin_visibility_pin ON pin_visibility(pin_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_pin_visibility_group ON pin_visibility(group_id)`);
 
     // Create admin user if provided
     if (process.env.ADMIN_PASSWORD) {

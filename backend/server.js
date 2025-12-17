@@ -231,19 +231,31 @@ app.get('/api/pins', authenticateToken, async (req, res) => {
       `;
       params = [];
     } else {
-      // Regular user sees own pins + group members' pins
+      // Regular user sees:
+      // 1. Their own pins
+      // 2. Pins from group members that either have no visibility settings OR are shared with a common group
       query = `
         SELECT DISTINCT p.*, u.username, 
-          ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
+          ARRAY_AGG(DISTINCT pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
         FROM pins p
         JOIN users u ON p.user_id = u.id
         LEFT JOIN pin_images pi ON p.id = pi.pin_id
         WHERE p.user_id = $1
-          OR p.user_id IN (
-            SELECT gm2.user_id 
-            FROM group_members gm1
-            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
-            WHERE gm1.user_id = $1 AND gm2.user_id != $1
+          OR (
+            p.user_id IN (
+              SELECT gm2.user_id 
+              FROM group_members gm1
+              JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+              WHERE gm1.user_id = $1 AND gm2.user_id != $1
+            )
+            AND (
+              NOT EXISTS (SELECT 1 FROM pin_visibility WHERE pin_id = p.id)
+              OR EXISTS (
+                SELECT 1 FROM pin_visibility pv
+                JOIN group_members gm ON pv.group_id = gm.group_id
+                WHERE pv.pin_id = p.id AND gm.user_id = $1
+              )
+            )
           )
         GROUP BY p.id, u.username
         ORDER BY p.created_at DESC
@@ -332,6 +344,135 @@ app.delete('/api/pins/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Delete pin error:', error);
     res.status(500).json({ error: 'Failed to delete pin' });
+  }
+});
+
+// Update pin
+app.put('/api/pins/:id', authenticateToken, upload.array('images', 5), async (req, res) => {
+  const { title, description, latitude, longitude } = req.body;
+
+  if (!title || !latitude || !longitude) {
+    return res.status(400).json({ error: 'Title, latitude, and longitude are required' });
+  }
+
+  try {
+    // Update pin
+    const result = await pool.query(
+      'UPDATE pins SET title = $1, description = $2, latitude = $3, longitude = $4 WHERE id = $5 AND user_id = $6 RETURNING *',
+      [title, description, parseFloat(latitude), parseFloat(longitude), req.params.id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Pin not found or unauthorized' });
+    }
+
+    // Add new images if provided
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await pool.query(
+          'INSERT INTO pin_images (pin_id, filename) VALUES ($1, $2)',
+          [req.params.id, file.filename]
+        );
+      }
+    }
+
+    // Get updated pin with images
+    const pinResult = await pool.query(`
+      SELECT p.*, u.username, ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
+      FROM pins p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN pin_images pi ON p.id = pi.pin_id
+      WHERE p.id = $1
+      GROUP BY p.id, u.username
+    `, [req.params.id]);
+
+    res.json(pinResult.rows[0]);
+  } catch (error) {
+    console.error('Update pin error:', error);
+    res.status(500).json({ error: 'Failed to update pin' });
+  }
+});
+
+// Get single pin details
+app.get('/api/pins/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.*, u.username, ARRAY_AGG(pi.filename) FILTER (WHERE pi.filename IS NOT NULL) as images
+      FROM pins p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN pin_images pi ON p.id = pi.pin_id
+      WHERE p.id = $1 AND p.user_id = $2
+      GROUP BY p.id, u.username
+    `, [req.params.id, req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Pin not found or unauthorized' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Get pin error:', error);
+    res.status(500).json({ error: 'Failed to fetch pin' });
+  }
+});
+
+// Set pin visibility (which groups can see it)
+app.post('/api/pins/:id/visibility', authenticateToken, async (req, res) => {
+  const { groupIds } = req.body; // array of group IDs
+
+  try {
+    // Verify pin ownership
+    const pinCheck = await pool.query(
+      'SELECT id FROM pins WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+
+    if (pinCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Pin not found or unauthorized' });
+    }
+
+    // Clear existing visibility settings
+    await pool.query('DELETE FROM pin_visibility WHERE pin_id = $1', [req.params.id]);
+
+    // Add new visibility settings
+    if (groupIds && groupIds.length > 0) {
+      for (const groupId of groupIds) {
+        // Verify user is member of group
+        const memberCheck = await pool.query(
+          'SELECT id FROM group_members WHERE group_id = $1 AND user_id = $2',
+          [groupId, req.user.id]
+        );
+
+        if (memberCheck.rows.length > 0) {
+          await pool.query(
+            'INSERT INTO pin_visibility (pin_id, group_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [req.params.id, groupId]
+          );
+        }
+      }
+    }
+
+    res.json({ message: 'Visibility updated successfully' });
+  } catch (error) {
+    console.error('Update visibility error:', error);
+    res.status(500).json({ error: 'Failed to update visibility' });
+  }
+});
+
+// Get pin visibility settings
+app.get('/api/pins/:id/visibility', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT pv.group_id, g.name as group_name
+      FROM pin_visibility pv
+      JOIN groups g ON pv.group_id = g.id
+      WHERE pv.pin_id = $1
+    `, [req.params.id]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get visibility error:', error);
+    res.status(500).json({ error: 'Failed to fetch visibility' });
   }
 });
 
